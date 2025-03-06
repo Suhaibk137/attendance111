@@ -194,6 +194,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       
+      // Disable form during submission
+      const submitBtn = this.querySelector('.submit-btn');
+      submitBtn.disabled = true;
+      
       try {
         const response = await fetch(`${API_BASE_URL}/employee/leave-request`, {
           method: 'POST',
@@ -206,13 +210,13 @@ document.addEventListener('DOMContentLoaded', function() {
           data = await response.json();
         } catch (parseError) {
           console.error('Error parsing response:', parseError);
-          throw new Error('Invalid server response');
+          throw new Error('Server response error');
         }
-        
+
         if (!response.ok) {
           throw new Error(data.msg || 'Failed to submit leave request');
         }
-        
+
         leaveRequestForm.reset();
         showSuccessMessage('Leave request submitted successfully', leaveRequestMessage);
         
@@ -220,7 +224,10 @@ document.addEventListener('DOMContentLoaded', function() {
         fetchNotifications();
       } catch (error) {
         console.error('Error submitting leave request:', error);
-        showErrorMessage(error.message || 'Failed to submit leave request', leaveRequestMessage);
+        showErrorMessage(error.message, leaveRequestMessage);
+      } finally {
+        // Re-enable form
+        submitBtn.disabled = false;
       }
     });
   
