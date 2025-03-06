@@ -254,6 +254,7 @@ router.post('/attendance/update', adminAuth, async (req, res) => {
 // @access  Admin
 router.get('/leave-requests', adminAuth, async (req, res) => {
   try {
+    // Only get leave requests that were directly submitted by employees
     const leaveRequests = await LeaveRequest.find()
       .populate('employee', 'name email emCode')
       .sort({ createdAt: -1 });
@@ -272,55 +273,73 @@ router.post('/leave-requests/update', adminAuth, async (req, res) => {
   const { leaveId, status } = req.body;
 
   try {
-    const leaveRequest = await LeaveRequest.findById(leaveId)
-      .populate('employee', 'name');
-    
+    // Validate input
+    if (!leaveId || !status) {
+      return res.status(400).json({ msg: 'Missing required fields' });
+    }
+
+    // Check if leave request exists
+    const leaveRequest = await LeaveRequest.findById(leaveId);
     if (!leaveRequest) {
       return res.status(404).json({ msg: 'Leave request not found' });
     }
     
+    // Update status
     leaveRequest.status = status;
     await leaveRequest.save();
     
-    // Create notification for employee
-    const notification = new Notification({
-      employee: leaveRequest.employee._id,
-      message: `Your leave request for ${moment(leaveRequest.leaveDate).format('MMMM DD, YYYY')} has been ${status.toLowerCase()}.`,
-      type: 'Leave'
-    });
+    // Populate employee information after saving
+    await leaveRequest.populate('employee', 'name _id');
     
-    await notification.save();
+    // Create notification for employee
+    try {
+      const notification = new Notification({
+        employee: leaveRequest.employee._id,
+        message: `Your leave request for ${moment(leaveRequest.leaveDate).format('MMMM DD, YYYY')} has been ${status.toLowerCase()}.`,
+        type: 'Leave'
+      });
+      
+      await notification.save();
+    } catch (notificationErr) {
+      console.error('Failed to create notification:', notificationErr.message);
+      // Continue even if notification fails
+    }
     
     // If approved, update attendance
     if (status === 'Approved') {
-      const leaveDate = moment(leaveRequest.leaveDate).startOf('day');
-      
-      // Find or create attendance record
-      let attendance = await Attendance.findOne({
-        employee: leaveRequest.employee._id,
-        date: {
-          $gte: leaveDate.toDate(),
-          $lt: moment(leaveDate).endOf('day').toDate()
-        }
-      });
-      
-      if (!attendance) {
-        attendance = new Attendance({
+      try {
+        const leaveDate = moment(leaveRequest.leaveDate).startOf('day');
+        
+        // Find or create attendance record
+        let attendance = await Attendance.findOne({
           employee: leaveRequest.employee._id,
-          date: leaveDate.toDate(),
-          status: 'Absent'  // Changed from "On Leave" to "Absent" as requested
+          date: {
+            $gte: leaveDate.toDate(),
+            $lt: moment(leaveDate).endOf('day').toDate()
+          }
         });
-      } else {
-        attendance.status = 'Absent';  // Changed from "On Leave" to "Absent" as requested
+        
+        if (!attendance) {
+          attendance = new Attendance({
+            employee: leaveRequest.employee._id,
+            date: leaveDate.toDate(),
+            status: 'Absent'  // Changed from "On Leave" to "Absent" as requested
+          });
+        } else {
+          attendance.status = 'Absent';  // Changed from "On Leave" to "Absent" as requested
+        }
+        
+        await attendance.save();
+      } catch (attendanceErr) {
+        console.error('Failed to update attendance:', attendanceErr.message);
+        // Continue even if attendance update fails
       }
-      
-      await attendance.save();
     }
     
-    res.json(leaveRequest);
+    return res.json(leaveRequest);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ msg: 'Server error' });
+    console.error('Leave request update error:', err.message);
+    return res.status(500).json({ msg: 'Server error', error: err.message });
   }
 });
 
