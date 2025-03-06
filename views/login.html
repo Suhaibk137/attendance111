@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELITE RESUME EMPLOYEE LOGIN</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/login.css">
+  <!-- Include Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <div class="login-card">
+      <div class="logo">
+        <h1>ELITE RESUME</h1>
+        <p>EMPLOYEE LOGIN</p>
+      </div>
+      
+      <div class="login-tabs">
+        <button class="tab-btn active" id="employee-tab">Employee</button>
+        <button class="tab-btn" id="admin-tab">Admin</button>
+      </div>
+      
+      <!-- Employee Login Form -->
+      <form id="employee-login-form" class="login-form">
+        <div class="form-group">
+          <label for="email"><i class="fas fa-envelope"></i> Email</label>
+          <input type="email" id="email" name="email" placeholder="Enter your email" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="employee-code"><i class="fas fa-id-card"></i> Employee Code</label>
+          <input type="password" id="employee-code" name="employeeCode" placeholder="Enter your employee code" required>
+        </div>
+        
+        <div id="employee-error" class="error-message"></div>
+        
+        <button type="submit" class="login-btn">Login</button>
+      </form>
+      
+      <!-- Admin Login Form (hidden by default) -->
+      <form id="admin-login-form" class="login-form hide">
+        <div class="form-group">
+          <label for="admin-username"><i class="fas fa-user"></i> Username</label>
+          <input type="text" id="admin-username" name="username" placeholder="Enter admin username" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="admin-password"><i class="fas fa-lock"></i> Password</label>
+          <input type="password" id="admin-password" name="password" placeholder="Enter admin password" required>
+        </div>
+        
+        <div id="admin-error" class="error-message"></div>
+        
+        <button type="submit" class="login-btn">Admin Login</button>
+      </form>
+    </div>
+  </div>
+  
+  <script src="js/config.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>

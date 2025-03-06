@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Dashboard | Elite Resume</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/employee.css">
+  <!-- Include Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">ELITE RESUME</div>
+      <div class="user-info">
+        <span id="employee-name">Loading...</span>
+        <button id="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Welcome Banner -->
+      <section class="welcome-banner">
+        <h1>Welcome, <span id="welcome-name">Employee</span></h1>
+        <p id="employee-position">Position</p>
+      </section>
+      
+      <!-- Feature Sections -->
+      <div class="features-container">
+        <!-- Attendance Section -->
+        <section class="feature-card">
+          <h2><i class="fas fa-clock"></i> Attendance</h2>
+          <div class="attendance-actions">
+            <button id="check-in-btn" class="action-btn check-in-btn">
+              <i class="fas fa-sign-in-alt"></i> Check In
+            </button>
+            <button id="check-out-btn" class="action-btn check-out-btn" disabled>
+              <i class="fas fa-sign-out-alt"></i> Check Out
+            </button>
+          </div>
+          <div id="attendance-status" class="attendance-status">
+            <p>Today's Status: <span id="today-status">Not checked in</span></p>
+            <p id="check-in-time"></p>
+            <p id="check-out-time"></p>
+          </div>
+        </section>
+        
+        <!-- Leave Request Section -->
+        <section class="feature-card">
+          <h2><i class="fas fa-calendar-alt"></i> Leave Request</h2>
+          <form id="leave-request-form">
+            <div class="form-group">
+              <label for="leave-date">Date of Leave:</label>
+              <input type="date" id="leave-date" name="leaveDate" required>
+            </div>
+            <div class="form-group">
+              <label for="leave-reason">Reason:</label>
+              <textarea id="leave-reason" name="reason" rows="3" required></textarea>
+            </div>
+            <button type="submit" class="submit-btn">Submit Request</button>
+          </form>
+          <div id="leave-request-message" class="status-message"></div>
+        </section>
+        
+        <!-- Monthly Attendance Section -->
+        <section class="feature-card large-card">
+          <h2><i class="fas fa-calendar-check"></i> Monthly Attendance</h2>
+          <div class="calendar-container">
+            <div class="month-selector">
+              <button id="prev-month"><i class="fas fa-chevron-left"></i></button>
+              <h3 id="current-month">March 2025</h3>
+              <button id="next-month"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="calendar" id="attendance-calendar">
+              <!-- Calendar will be generated via JavaScript -->
+            </div>
+            <div class="calendar-legend">
+              <div class="legend-item">
+                <div class="color-box present"></div>
+                <span>Present</span>
+              </div>
+              <div class="legend-item">
+                <div class="color-box absent"></div>
+                <span>Absent</span>
+              </div>
+              <div class="legend-item">
+                <div class="color-box half-day"></div>
+                <span>Half Day</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+    
+    <!-- Footer -->
+    <footer class="footer">
+      <p>&copy; 2025 Elite Resume. All rights reserved.</p>
+    </footer>
+  </div>
+  
+  <script src="js/config.js"></script>
+  <script src="js/employee.js"></script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+/* Global CSS Variables */
+:root {
+    --primary-color: #4a6fa5;
+    --primary-light: #6b8cb2;
+    --primary-dark: #345481;
+    --secondary-color: #e67e22;
+    --text-color: #333;
+    --text-light: #666;
+    --bg-color: #f5f7fa;
+    --card-bg: #ffffff;
+    --border-color: #ddd;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+    --info-color: #3498db;
+    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --radius: 6px;
+  }
+  
+  /* Reset and Base Styles */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  html, body {
+    height: 100%;
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+  }
+  
+  a {
+    color: var(--primary-color);
+    text-decoration: none;
+  }
+  
+  a:hover {
+    text-decoration: underline;
+  }
+  
+  button, .btn {
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background-color: var(--primary-color);
+    color: white;
+    transition: all 0.2s ease;
+  }
+  
+  button:hover, .btn:hover {
+    background-color: var(--primary-dark);
+  }
+  
+  button:disabled, .btn:disabled {
+    background-color: var(--text-light);
+    cursor: not-allowed;
+  }
+  
+  input, select, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    width: 100%;
+  }
+  
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2);
+  }
+  
+  /* Layout Components */
+  .app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  .header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow);
+  }
+  
+  .logo {
+    font-size: 20px;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+  
+  .main-content {
+    flex: 1;
+    padding: 20px;
+  }
+  
+  .footer {
+    background-color: var(--primary-dark);
+    color: rgba(255, 255, 255, 0.8);
+    text-align: center;
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  /* Common Components */
+  .card {
+    background-color: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .form-group {
+    margin-bottom: 16px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  
+  .error-message {
+    color: var(--danger-color);
+    font-size: 14px;
+    margin-top: 8px;
+    min-height: 20px;
+  }
+  
+  .status-message {
+    font-size: 14px;
+    margin-top: 8px;
+    min-height: 20px;
+  }
+  
+  .status-message.success {
+    color: var(--success-color);
+  }
+  
+  .status-message.error {
+    color: var(--danger-color);
+  }
+  
+  /* Utility Classes */
+  .text-center {
+    text-align: center;
+  }
+  
+  .hide {
+    display: none !important;
+  }
+  
+  .success-text {
+    color: var(--success-color);
+  }
+  
+  .error-text {
+    color: var(--danger-color);
+  }
+  
+  .warning-text {
+    color: var(--warning-color);
+  }
+  
+  .info-text {
+    color: var(--info-color);
+  }
+  
+  /* Responsive Adjustments */
+  @media screen and (max-width: 768px) {
+    .header {
+      padding: 12px;
+    }
+    
+    .logo {
+      font-size: 18px;
+    }
+    
+    .main-content {
+      padding: 16px;
+    }
+    
+    button, .btn {
+      padding: 6px 12px;
+    }
+  }

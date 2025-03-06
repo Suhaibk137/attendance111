@@ -1,0 +1,153 @@
+/* Login Page Styles */
+body {
+    background-color: #f5f7fa;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  
+  .container {
+    width: 100%;
+    max-width: 400px;
+    padding: 20px;
+  }
+  
+  .login-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    overflow: hidden;
+  }
+  
+  .logo {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  
+  .logo h1 {
+    color: var(--primary-color);
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+  
+  .logo p {
+    color: var(--text-light);
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+  
+  .login-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .tab-btn {
+    flex: 1;
+    background: none;
+    color: var(--text-light);
+    border: none;
+    padding: 12px;
+    font-size: 16px;
+    position: relative;
+    transition: color 0.2s;
+  }
+  
+  .tab-btn.active {
+    color: var(--primary-color);
+  }
+  
+  .tab-btn.active:after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: var(--primary-color);
+  }
+  
+  .login-form {
+    transition: all 0.3s ease;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-color);
+    font-weight: 500;
+  }
+  
+  .form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 16px;
+  }
+  
+  .form-group input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2);
+    outline: none;
+  }
+  
+  .login-btn {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .login-btn:hover {
+    background-color: var(--primary-dark);
+  }
+  
+  .error-message {
+    color: var(--danger-color);
+    font-size: 14px;
+    margin-bottom: 16px;
+    text-align: center;
+    min-height: 20px;
+  }
+  
+  /* Responsive adjustments */
+  @media screen and (max-width: 480px) {
+    .container {
+      padding: 12px;
+    }
+    
+    .login-card {
+      padding: 20px;
+    }
+    
+    .logo h1 {
+      font-size: 24px;
+    }
+    
+    .form-group input, .login-btn {
+      padding: 10px;
+    }
+  }
+  
+  /* Animation for form switching */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .login-form {
+    animation: fadeIn 0.3s ease forwards;
+  }
