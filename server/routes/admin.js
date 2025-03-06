@@ -41,7 +41,7 @@ router.get('/employees', adminAuth, async (req, res) => {
     res.json(employees);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -99,7 +99,7 @@ router.get('/attendance', adminAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -182,7 +182,7 @@ router.get('/attendance/monthly', adminAuth, async (req, res) => {
     res.json(attendance);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -193,6 +193,17 @@ router.post('/attendance/update', adminAuth, async (req, res) => {
   const { employeeId, date, status } = req.body;
 
   try {
+    // Validate inputs
+    if (!employeeId || !date || !status) {
+      return res.status(400).json({ msg: 'Missing required fields' });
+    }
+
+    // Verify employee exists
+    const employee = await Employee.findById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ msg: 'Employee not found' });
+    }
+
     // Format the date
     const attendanceDate = moment(date).startOf('day');
     
@@ -218,18 +229,23 @@ router.post('/attendance/update', adminAuth, async (req, res) => {
     await attendance.save();
     
     // Create notification for employee
-    const notification = new Notification({
-      employee: employeeId,
-      message: `Your attendance for ${moment(date).format('MMMM DD, YYYY')} has been marked as "${status}" by admin.`,
-      type: 'Attendance'
-    });
+    try {
+      const notification = new Notification({
+        employee: employeeId,
+        message: `Your attendance for ${moment(date).format('MMMM DD, YYYY')} has been marked as "${status}" by admin.`,
+        type: 'Attendance'
+      });
+      
+      await notification.save();
+    } catch (notificationErr) {
+      // Continue even if notification fails
+      console.error('Failed to create notification:', notificationErr.message);
+    }
     
-    await notification.save();
-    
-    res.json(attendance);
+    return res.json(attendance);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    console.error('Attendance update error:', err.message);
+    return res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -245,7 +261,7 @@ router.get('/leave-requests', adminAuth, async (req, res) => {
     res.json(leaveRequests);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -304,7 +320,7 @@ router.post('/leave-requests/update', adminAuth, async (req, res) => {
     res.json(leaveRequest);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
