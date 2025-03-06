@@ -254,12 +254,23 @@ router.post('/attendance/update', adminAuth, async (req, res) => {
 // @access  Admin
 router.get('/leave-requests', adminAuth, async (req, res) => {
   try {
-    // Only get leave requests that were directly submitted by employees
-    const leaveRequests = await LeaveRequest.find()
-      .populate('employee', 'name email emCode')
-      .sort({ createdAt: -1 });
+    // Only get valid leave requests that were directly submitted by employees
+    // Filter out records with invalid dates or automatically generated entries
+    const leaveRequests = await LeaveRequest.find({
+      // Make sure the leaveDate is valid (not null or undefined)
+      leaveDate: { $exists: true, $ne: null }
+    })
+    .populate('employee', 'name email emCode')
+    .sort({ createdAt: -1 });
     
-    res.json(leaveRequests);
+    // Additional filtering to remove invalid dates
+    const validLeaveRequests = leaveRequests.filter(request => {
+      // Check if leaveDate is valid
+      const date = new Date(request.leaveDate);
+      return !isNaN(date.getTime());
+    });
+    
+    res.json(validLeaveRequests);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ msg: 'Server error' });
