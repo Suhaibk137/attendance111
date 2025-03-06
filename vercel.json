@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server/server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "server/server.js" },
+    { "src": "/", "dest": "views/login.html" },
+    { "src": "/employee", "dest": "views/employee.html" },
+    { "src": "/admin", "dest": "views/admin.html" },
+    { "src": "/css/(.*)", "dest": "public/css/$1" },
+    { "src": "/js/(.*)", "dest": "public/js/$1" },
+    { "src": "/img/(.*)", "dest": "public/img/$1" },
+    { "src": "/(.*)", "dest": "public/$1" }
+  ]
+}
