@@ -138,31 +138,28 @@ router.post('/leave-request', auth, async (req, res) => {
   const { leaveDate, reason } = req.body;
 
   try {
-    // Check if a leave request already exists for this date
-    const existingRequest = await LeaveRequest.findOne({
-      employee: req.employee.id,
-      leaveDate: {
-        $gte: moment(leaveDate).startOf('day').toDate(),
-        $lt: moment(leaveDate).endOf('day').toDate()
-      }
-    });
-
-    if (existingRequest) {
-      return res.status(400).json({ msg: 'You already have a leave request for this date' });
-    }
-
+    // Format the date properly for MongoDB
+    const formattedLeaveDate = moment(leaveDate).format('YYYY-MM-DD');
+    
+    // Create a leave request with properly formatted date
     const leave = new LeaveRequest({
       employee: req.employee.id,
-      leaveDate,
+      leaveDate: new Date(formattedLeaveDate),
       reason
     });
 
     await leave.save();
 
-    res.json(leave);
+    return res.json(leave);
   } catch (err) {
     console.error('Leave request error:', err.message);
-    return res.status(500).json({ msg: 'Server error', error: err.message });
+    
+    // If it's a duplicate key error, send a meaningful message
+    if (err.code === 11000) {
+      return res.status(400).json({ msg: 'You already have a leave request for this date' });
+    }
+    
+    return res.status(500).json({ msg: 'Server error' });
   }
 });
 
