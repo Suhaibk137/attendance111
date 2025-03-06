@@ -453,29 +453,24 @@ document.addEventListener('DOMContentLoaded', function() {
         body: JSON.stringify({ employeeId, date, status })
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
+      // Always close modal and reload data
+      statusModal.classList.remove('visible');
+      
+      // If response wasn't successful, show a message but still reload data
+      if (response.status >= 400) {
+        setTimeout(() => {
+          alert('Note: There was an issue with updating the status, but data has been refreshed.');
+        }, 500);
       }
       
-      if (!response.ok) {
-        throw new Error(data?.msg || 'Failed to update status');
-      }
-
-      // Close modal and reload attendance data
-      statusModal.classList.remove('visible');
+      // Always reload data regardless of response status
       loadAttendanceData();
       
     } catch (error) {
       console.error('Error updating status:', error);
-      
-      // Even if there's an error, try to refresh the data
       statusModal.classList.remove('visible');
       loadAttendanceData();
       
-      // Inform the user but don't block the workflow
       setTimeout(() => {
         alert('Note: There was an issue with updating the status, but data has been refreshed. The change may have been applied.');
       }, 500);
