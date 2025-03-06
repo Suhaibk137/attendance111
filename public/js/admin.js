@@ -397,7 +397,14 @@ document.addEventListener('DOMContentLoaded', function() {
       loadLeaveRequestsData();
     } catch (error) {
       console.error('Error updating leave request:', error);
-      alert('Failed to update leave request. Please try again.');
+      
+      // Still reload data even if there was an error
+      loadLeaveRequestsData();
+      
+      // Inform the user but in a non-blocking way
+      setTimeout(() => {
+        alert('Note: There was an issue updating the leave request, but data has been refreshed.');
+      }, 500);
     }
   }
 
