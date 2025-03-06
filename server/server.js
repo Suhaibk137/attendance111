@@ -11,14 +11,16 @@ connectDB();
 const app = express();
 
 // Middleware
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? false  // In production, only allow same-origin requests
-    : 'http://localhost:3000' // In development, allow localhost
-};
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, '../public')));
+
+// Use static files (only for local development)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(express.static(path.join(__dirname, '../public')));
+} else {
+  // For production, still serve static files for Vercel
+  app.use(express.static(path.join(__dirname, '../public')));
+}
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -40,6 +42,10 @@ app.get('/admin', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
+// Listen in all environments, Vercel will manage this properly
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// For Vercel, we need to export the Express app
+module.exports = app;
