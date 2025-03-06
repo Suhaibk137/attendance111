@@ -23,6 +23,9 @@ const leaveRequestSchema = mongoose.Schema({
   timestamps: true
 });
 
+// Add an index for employee and leaveDate to ensure uniqueness
+leaveRequestSchema.index({ employee: 1, leaveDate: 1 }, { unique: true });
+
 const LeaveRequest = mongoose.model('LeaveRequest', leaveRequestSchema, 'data-from-employee-dashboard');
 
 module.exports = LeaveRequest;
