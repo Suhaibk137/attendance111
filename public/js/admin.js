@@ -382,8 +382,15 @@ document.addEventListener('DOMContentLoaded', function() {
         body: JSON.stringify({ leaveId, status })
       });
 
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+      }
+
       if (!response.ok) {
-        throw new Error('Failed to update leave request');
+        throw new Error(data?.msg || 'Failed to update leave request');
       }
 
       // Reload leave requests after update

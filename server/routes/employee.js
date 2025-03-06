@@ -36,7 +36,7 @@ router.get('/me', auth, async (req, res) => {
     res.json(employee);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -88,7 +88,7 @@ router.post('/check-in', auth, async (req, res) => {
     res.json(attendance);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -127,7 +127,7 @@ router.post('/check-out', auth, async (req, res) => {
     res.json(attendance);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -138,6 +138,19 @@ router.post('/leave-request', auth, async (req, res) => {
   const { leaveDate, reason } = req.body;
 
   try {
+    // Check if a leave request already exists for this date
+    const existingRequest = await LeaveRequest.findOne({
+      employee: req.employee.id,
+      leaveDate: {
+        $gte: moment(leaveDate).startOf('day').toDate(),
+        $lt: moment(leaveDate).endOf('day').toDate()
+      }
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({ msg: 'You already have a leave request for this date' });
+    }
+
     const leave = new LeaveRequest({
       employee: req.employee.id,
       leaveDate,
@@ -148,8 +161,8 @@ router.post('/leave-request', auth, async (req, res) => {
 
     res.json(leave);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    console.error('Leave request error:', err.message);
+    return res.status(500).json({ msg: 'Server error', error: err.message });
   }
 });
 
@@ -172,7 +185,7 @@ router.get('/attendance', auth, async (req, res) => {
     res.json(attendance);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 
@@ -190,7 +203,7 @@ router.get('/notifications', auth, async (req, res) => {
     res.json(notifications);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(500).json({ msg: 'Server error' });
   }
 });
 

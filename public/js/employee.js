@@ -201,12 +201,17 @@ document.addEventListener('DOMContentLoaded', function() {
         body: JSON.stringify({ leaveDate, reason })
       });
 
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error('Invalid server response');
+      }
+      
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.msg || 'Failed to submit leave request');
       }
-
-      await response.json();
       
       leaveRequestForm.reset();
       showSuccessMessage('Leave request submitted successfully', leaveRequestMessage);
