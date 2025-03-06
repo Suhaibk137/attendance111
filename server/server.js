@@ -5,22 +5,39 @@ const bodyParser = require('body-parser');
 const connectDB = require('./config/db');
 require('dotenv').config();
 
-// Connect to MongoDB
-connectDB();
-
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, '../public')));
 
-// Use static files (only for local development)
-if (process.env.NODE_ENV !== 'production') {
-  app.use(express.static(path.join(__dirname, '../public')));
-} else {
-  // For production, still serve static files for Vercel
-  app.use(express.static(path.join(__dirname, '../public')));
-}
+// Connect to MongoDB with error handling
+let dbConnected = false;
+connectDB()
+  .then(() => {
+    dbConnected = true;
+    console.log('MongoDB connected successfully');
+  })
+  .catch(err => {
+    console.error('MongoDB connection error:', err.message);
+    // Continue execution even if DB connection fails
+  });
+
+// Add middleware to check DB connection
+app.use((req, res, next) => {
+  if (!dbConnected && !req.path.includes('/health')) {
+    return res.status(503).json({ 
+      msg: 'Database connection not established, please try again later'
+    });
+  }
+  next();
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', dbConnected });
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -40,12 +57,20 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, '../views/admin.html'));
 });
 
-const PORT = process.env.PORT || 3000;
-
-// Listen in all environments, Vercel will manage this properly
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({ msg: 'Server error', error: err.message });
 });
 
-// For Vercel, we need to export the Express app
+const PORT = process.env.PORT || 3000;
+
+// Only start the server if not in production (Vercel is serverless)
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Export for serverless
 module.exports = app;
