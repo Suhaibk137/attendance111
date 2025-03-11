@@ -45,13 +45,17 @@ router.get('/me', auth, async (req, res) => {
 // @access  Private
 router.post('/check-in', auth, async (req, res) => {
   try {
+    console.log(`Check-in attempt for employee ${req.employee.id}`);
+    
     // First, clean up any records with null dates
-    await Attendance.deleteMany({
+    const cleanupResult = await Attendance.deleteMany({
       employee: req.employee.id,
       date: null
     });
+    console.log(`Cleaned up ${cleanupResult.deletedCount} records with null dates`);
     
     const today = moment().startOf('day');
+    console.log(`Today's date (server time): ${today.format('YYYY-MM-DD')}`);
     
     // Check if employee has already checked in today
     const existingAttendance = await Attendance.findOne({
@@ -62,33 +66,76 @@ router.post('/check-in', auth, async (req, res) => {
       }
     });
 
-    if (existingAttendance && existingAttendance.checkInTime) {
-      return res.status(400).json({ msg: 'Already checked in today' });
-    }
-
+    console.log(`Existing attendance record found: ${existingAttendance ? 'Yes' : 'No'}`);
+    
     const now = new Date();
 
     if (existingAttendance) {
-      // Update existing record
-      existingAttendance.checkInTime = now;
-      existingAttendance.status = 'Present';
-      await existingAttendance.save();
+      console.log(`Existing record ID: ${existingAttendance._id}`);
+      // If record exists but no check-in time, update it
+      if (!existingAttendance.checkInTime) {
+        console.log('No check-in time on existing record, updating...');
+        existingAttendance.checkInTime = now;
+        existingAttendance.status = 'Present';
+        await existingAttendance.save();
+        console.log('Record updated successfully');
+      } else {
+        console.log(`Already checked in at: ${existingAttendance.checkInTime}`);
+      }
       return res.json(existingAttendance);
     }
 
-    // Create new attendance record - ensure date is set correctly
+    // Create new attendance record with more precise date
+    // Convert the date to a string and back to ensure consistent date format
+    const formattedDate = today.format('YYYY-MM-DD');
+    const normalizedDate = new Date(formattedDate);
+    
+    console.log(`Creating new attendance record for date: ${formattedDate}`);
+    
     const attendance = new Attendance({
       employee: req.employee.id,
-      date: today.toDate(),  // Explicitly set to today
+      date: normalizedDate,
       checkInTime: now,
       status: 'Present'
     });
 
-    await attendance.save();
-    res.json(attendance);
+    console.log(`New attendance record prepared: ${JSON.stringify(attendance)}`);
+    
+    const savedAttendance = await attendance.save();
+    console.log(`Attendance record saved successfully with ID: ${savedAttendance._id}`);
+    
+    res.json(savedAttendance);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ msg: 'Server error' });
+    console.error('Check-in error details:', err);
+    
+    // More specific error message based on error type
+    if (err.code === 11000) {
+      // This is a duplicate key error
+      console.error('Duplicate key error detected');
+      
+      try {
+        // Try to find and return the existing record
+        const today = moment().startOf('day');
+        const existingRecord = await Attendance.findOne({
+          employee: req.employee.id,
+          date: {
+            $gte: today.toDate(),
+            $lt: moment(today).endOf('day').toDate()
+          }
+        });
+        
+        if (existingRecord) {
+          console.log(`Found existing record during error recovery: ${existingRecord._id}`);
+          return res.json(existingRecord);
+        }
+      } catch (recoveryErr) {
+        console.error('Error during recovery attempt:', recoveryErr);
+      }
+      
+      return res.status(400).json({ msg: 'Already checked in today. Please try refreshing the page.' });
+    }
+    
+    res.status(500).json({ msg: 'Server error: ' + err.message });
   }
 });
 
@@ -97,7 +144,10 @@ router.post('/check-in', auth, async (req, res) => {
 // @access  Private
 router.post('/check-out', auth, async (req, res) => {
   try {
+    console.log(`Check-out attempt for employee ${req.employee.id}`);
+    
     const today = moment().startOf('day');
+    console.log(`Today's date (server time): ${today.format('YYYY-MM-DD')}`);
     
     // Find today's attendance record
     const attendance = await Attendance.findOne({
@@ -108,6 +158,8 @@ router.post('/check-out', auth, async (req, res) => {
       }
     });
 
+    console.log(`Attendance record found: ${attendance ? 'Yes' : 'No'}`);
+    
     if (!attendance) {
       return res.status(400).json({ msg: 'Please check in first' });
     }
@@ -117,17 +169,21 @@ router.post('/check-out', auth, async (req, res) => {
     }
 
     if (attendance.checkOutTime) {
+      console.log(`Already checked out at: ${attendance.checkOutTime}`);
       return res.status(400).json({ msg: 'Already checked out today' });
     }
 
     // Update check out time
     attendance.checkOutTime = new Date();
+    console.log(`Setting check-out time to: ${attendance.checkOutTime}`);
+    
     await attendance.save();
+    console.log('Check-out successful');
 
     res.json(attendance);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ msg: 'Server error' });
+    console.error('Check-out error details:', err);
+    res.status(500).json({ msg: 'Server error: ' + err.message });
   }
 });
 
@@ -201,6 +257,62 @@ router.get('/notifications', auth, async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+// @route   POST api/employee/fix-attendance
+// @desc    Fix duplicate attendance records
+// @access  Private
+router.post('/fix-attendance', auth, async (req, res) => {
+  try {
+    console.log(`Attempting to fix attendance records for employee ${req.employee.id}`);
+    
+    // Find all attendance records for this employee
+    const records = await Attendance.find({ employee: req.employee.id });
+    console.log(`Found ${records.length} total attendance records`);
+    
+    // Group by date (YYYY-MM-DD format)
+    const recordsByDate = {};
+    records.forEach(record => {
+      const dateKey = moment(record.date).format('YYYY-MM-DD');
+      if (!recordsByDate[dateKey]) {
+        recordsByDate[dateKey] = [];
+      }
+      recordsByDate[dateKey].push(record);
+    });
+    
+    // For dates with multiple records, keep only the most complete one
+    let cleaned = 0;
+    for (const dateKey in recordsByDate) {
+      const dateRecords = recordsByDate[dateKey];
+      if (dateRecords.length > 1) {
+        console.log(`Found ${dateRecords.length} records for date ${dateKey}`);
+        
+        // Sort by completeness (records with both check-in and check-out first)
+        dateRecords.sort((a, b) => {
+          const aScore = (a.checkInTime ? 1 : 0) + (a.checkOutTime ? 1 : 0);
+          const bScore = (b.checkInTime ? 1 : 0) + (b.checkOutTime ? 1 : 0);
+          return bScore - aScore;
+        });
+        
+        // Keep the first (most complete) record, delete the rest
+        for (let i = 1; i < dateRecords.length; i++) {
+          console.log(`Deleting duplicate record ${dateRecords[i]._id} for date ${dateKey}`);
+          await Attendance.findByIdAndDelete(dateRecords[i]._id);
+          cleaned++;
+        }
+      }
+    }
+    
+    console.log(`Database fix completed. Cleaned ${cleaned} duplicate records.`);
+    res.json({ 
+      message: `Database fixed. Cleaned ${cleaned} duplicate records.`,
+      success: true,
+      recordsCleaned: cleaned
+    });
+  } catch (err) {
+    console.error('Fix attendance error:', err);
+    res.status(500).json({ msg: 'Server error: ' + err.message });
   }
 });
 
