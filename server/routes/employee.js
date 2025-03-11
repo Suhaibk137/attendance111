@@ -6,6 +6,7 @@ const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const Notification = require('../models/Notification');
 const moment = require('moment');
+const mongoose = require('mongoose');
 
 // Middleware to verify employee token
 const auth = async (req, res, next) => {
@@ -54,55 +55,43 @@ router.post('/check-in', auth, async (req, res) => {
     });
     console.log(`Cleaned up ${cleanupResult.deletedCount} records with null dates`);
     
-    const today = moment().startOf('day');
-    console.log(`Today's date (server time): ${today.format('YYYY-MM-DD')}`);
+    // Use a simple date string for consistency
+    const today = new Date();
+    const dateString = today.toISOString().split('T')[0]; // Gets YYYY-MM-DD
+    const todayDate = new Date(dateString);
     
-    // Check if employee has already checked in today
-    const existingAttendance = await Attendance.findOne({
+    console.log(`Check-in date: ${dateString}`);
+    
+    // First try to find an existing record
+    let attendance = await Attendance.findOne({
       employee: req.employee.id,
       date: {
-        $gte: today.toDate(),
-        $lt: moment(today).endOf('day').toDate()
+        $gte: new Date(dateString),
+        $lt: new Date(new Date(dateString).setDate(new Date(dateString).getDate() + 1))
       }
     });
-
-    console.log(`Existing attendance record found: ${existingAttendance ? 'Yes' : 'No'}`);
     
-    const now = new Date();
-
-    if (existingAttendance) {
-      console.log(`Existing record ID: ${existingAttendance._id}`);
-      // If record exists but no check-in time, update it
-      if (!existingAttendance.checkInTime) {
-        console.log('No check-in time on existing record, updating...');
-        existingAttendance.checkInTime = now;
-        existingAttendance.status = 'Present';
-        await existingAttendance.save();
-        console.log('Record updated successfully');
-      } else {
-        console.log(`Already checked in at: ${existingAttendance.checkInTime}`);
+    if (attendance) {
+      console.log(`Found existing attendance record: ${attendance._id}`);
+      // Update existing record if no check-in time
+      if (!attendance.checkInTime) {
+        attendance.checkInTime = today;
+        attendance.status = 'Present';
+        await attendance.save();
       }
-      return res.json(existingAttendance);
+      return res.json(attendance);
     }
-
-    // Create new attendance record with more precise date
-    // Convert the date to a string and back to ensure consistent date format
-    const formattedDate = today.format('YYYY-MM-DD');
-    const normalizedDate = new Date(formattedDate);
     
-    console.log(`Creating new attendance record for date: ${formattedDate}`);
-    
-    const attendance = new Attendance({
+    // Create new attendance record
+    attendance = new Attendance({
       employee: req.employee.id,
-      date: normalizedDate,
-      checkInTime: now,
+      date: todayDate,
+      checkInTime: today,
       status: 'Present'
     });
-
-    console.log(`New attendance record prepared: ${JSON.stringify(attendance)}`);
     
     const savedAttendance = await attendance.save();
-    console.log(`Attendance record saved successfully with ID: ${savedAttendance._id}`);
+    console.log(`Created new attendance record: ${savedAttendance._id}`);
     
     res.json(savedAttendance);
   } catch (err) {
@@ -194,6 +183,10 @@ router.post('/leave-request', auth, async (req, res) => {
   const { leaveDate, reason } = req.body;
 
   try {
+    if (!leaveDate) {
+      return res.status(400).json({ msg: 'Leave date is required' });
+    }
+    
     // Format the date properly for MongoDB
     const formattedLeaveDate = moment(leaveDate).format('YYYY-MM-DD');
     
@@ -215,7 +208,7 @@ router.post('/leave-request', auth, async (req, res) => {
       return res.status(400).json({ msg: 'You already have a leave request for this date' });
     }
     
-    return res.status(500).json({ msg: 'Server error' });
+    return res.status(500).json({ msg: 'Server error: ' + err.message });
   }
 });
 
@@ -257,6 +250,76 @@ router.get('/notifications', auth, async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+// @route   POST api/employee/fix-database
+// @desc    Fix database issues with null leaveDate
+// @access  Private
+router.post('/fix-database', auth, async (req, res) => {
+  try {
+    console.log('Starting database cleanup...');
+    
+    // Remove records with null leaveDate
+    const deleteResult = await mongoose.connection.db
+      .collection('data-from-employee-dashboard')
+      .deleteMany({ 
+        leaveDate: null 
+      });
+    
+    console.log(`Deleted ${deleteResult.deletedCount} records with null leaveDate`);
+    
+    // Also remove potential duplicate attendance records for this employee
+    const employeeId = req.employee.id;
+    
+    // Get all dates with attendance records for this employee
+    const records = await Attendance.find({ employee: employeeId });
+    console.log(`Found ${records.length} attendance records for employee ${employeeId}`);
+    
+    // Group by date
+    const dateMap = {};
+    let duplicatesRemoved = 0;
+    
+    for (const record of records) {
+      const dateKey = moment(record.date).format('YYYY-MM-DD');
+      
+      if (!dateMap[dateKey]) {
+        dateMap[dateKey] = [];
+      }
+      
+      dateMap[dateKey].push(record);
+    }
+    
+    // Check for dates with multiple records
+    for (const dateKey in dateMap) {
+      const dateRecords = dateMap[dateKey];
+      if (dateRecords.length > 1) {
+        console.log(`Found ${dateRecords.length} records for date ${dateKey}`);
+        
+        // Sort by most complete (checked in & out)
+        dateRecords.sort((a, b) => {
+          const aComplete = (a.checkInTime ? 1 : 0) + (a.checkOutTime ? 1 : 0);
+          const bComplete = (b.checkInTime ? 1 : 0) + (b.checkOutTime ? 1 : 0);
+          return bComplete - aComplete;
+        });
+        
+        // Keep the first one, delete the rest
+        for (let i = 1; i < dateRecords.length; i++) {
+          await Attendance.findByIdAndDelete(dateRecords[i]._id);
+          duplicatesRemoved++;
+        }
+      }
+    }
+    
+    return res.json({
+      success: true,
+      nullRecordsRemoved: deleteResult.deletedCount,
+      duplicateAttendanceRecordsRemoved: duplicatesRemoved,
+      message: `Database fixed. Removed ${deleteResult.deletedCount} null records and ${duplicatesRemoved} duplicate attendance records.`
+    });
+  } catch (err) {
+    console.error('Database fix error:', err);
+    res.status(500).json({ msg: 'Server error: ' + err.message });
   }
 });
 
