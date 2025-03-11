@@ -130,9 +130,36 @@ document.addEventListener('DOMContentLoaded', function() {
       return `${year}-${month}-${day}`;
     }
   
-    // Check-in functionality
-    checkInBtn.addEventListener('click', async function() {
+    // Fix duplicate attendance records
+    async function fixAttendanceRecords() {
       try {
+        const response = await fetch(`${API_BASE_URL}/employee/fix-attendance`, {
+          method: 'POST',
+          headers
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fix attendance records');
+        }
+
+        const result = await response.json();
+        console.log('Fix attendance result:', result);
+        
+        // Refresh attendance data
+        await fetchTodayAttendance();
+        await fetchMonthlyAttendance();
+        
+        return result;
+      } catch (error) {
+        console.error('Error fixing attendance records:', error);
+      }
+    }
+
+    // Check-in with retry capability
+    async function performCheckIn() {
+      try {
+        checkInBtn.disabled = true; // Prevent double-clicks
+        
         const response = await fetch(`${API_BASE_URL}/employee/check-in`, {
           method: 'POST',
           headers
@@ -151,15 +178,42 @@ document.addEventListener('DOMContentLoaded', function() {
         checkInTime.textContent = `Checked in at: ${formatTime(new Date(attendance.checkInTime))}`;
         
         showSuccessMessage('Checked in successfully!');
+        
+        // Update calendar
+        fetchMonthlyAttendance();
       } catch (error) {
         console.error('Error checking in:', error);
-        showErrorMessage(error.message || 'Failed to check in');
+        checkInBtn.disabled = false; // Re-enable button
+        
+        // If we get a server error, try to fix the database and try again
+        if (error.message.includes('Server error')) {
+          showErrorMessage('Attempting to fix check-in issue...');
+          
+          try {
+            await fixAttendanceRecords();
+            // Try check-in again after fixing
+            showErrorMessage('Database fixed. Trying to check in again...');
+            setTimeout(async () => {
+              await fetchTodayAttendance();
+            }, 1000);
+          } catch (fixError) {
+            console.error('Error during fix attempt:', fixError);
+            showErrorMessage('Could not resolve check-in issue. Please contact support.');
+          }
+        } else {
+          showErrorMessage(error.message || 'Failed to check in');
+        }
       }
-    });
+    }
+  
+    // Check-in functionality
+    checkInBtn.addEventListener('click', performCheckIn);
   
     // Check-out functionality
     checkOutBtn.addEventListener('click', async function() {
       try {
+        checkOutBtn.disabled = true; // Prevent double-clicks
+        
         const response = await fetch(`${API_BASE_URL}/employee/check-out`, {
           method: 'POST',
           headers
@@ -176,8 +230,12 @@ document.addEventListener('DOMContentLoaded', function() {
         checkOutTime.textContent = `Checked out at: ${formatTime(new Date(attendance.checkOutTime))}`;
         
         showSuccessMessage('Checked out successfully!');
+        
+        // Update calendar
+        fetchMonthlyAttendance();
       } catch (error) {
         console.error('Error checking out:', error);
+        checkOutBtn.disabled = false; // Re-enable button
         showErrorMessage(error.message || 'Failed to check out');
       }
     });
@@ -406,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
       setTimeout(() => {
         element.textContent = '';
         element.className = 'status-message';
-      }, 3000);
+      }, 5000);
     }
   
     // Logout functionality
