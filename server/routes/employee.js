@@ -8,9 +8,6 @@ const Notification = require('../models/Notification');
 const moment = require('moment');
 const mongoose = require('mongoose');
 
-// Set default timezone to IST (UTC+5:30)
-moment.tz.setDefault("Asia/Kolkata");
-
 // Middleware to verify employee token
 const auth = async (req, res, next) => {
   // Get token from header
@@ -58,14 +55,15 @@ router.post('/check-in', auth, async (req, res) => {
     });
     console.log(`Cleaned up ${cleanupResult.deletedCount} records with null dates`);
     
-    // Use IST timezone for today's date
-    const today = moment().format('YYYY-MM-DD');
-    const todayDate = new Date(today);
-    const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
+    // FORCE SET THE DATE TO MARCH 12TH FOR TESTING
+    // Remove this hardcoded date after testing!
+    const forcedToday = "2025-03-12";
+    const todayDate = new Date(forcedToday);
+    const tomorrowDate = new Date(new Date(forcedToday).getTime() + 24*60*60*1000);
     
-    console.log(`Check-in date (IST): ${today}`);
+    console.log(`Using forced date: ${forcedToday}`);
     
-    // First try to find an existing record using IST dates
+    // Find if there's an existing attendance for the forced date
     let attendance = await Attendance.findOne({
       employee: req.employee.id,
       date: {
@@ -74,18 +72,22 @@ router.post('/check-in', auth, async (req, res) => {
       }
     });
     
+    console.log(`Existing attendance for forced date: ${attendance ? 'Yes' : 'No'}`);
+    
     if (attendance) {
-      console.log(`Found existing attendance record: ${attendance._id}`);
-      // Update existing record if no check-in time
+      // If record exists but no check-in time, update it
       if (!attendance.checkInTime) {
         attendance.checkInTime = new Date();
         attendance.status = 'Present';
         await attendance.save();
+        console.log('Updated existing attendance record with check-in time');
+      } else {
+        console.log('Attendance record already has check-in time');
       }
       return res.json(attendance);
     }
-    
-    // Create new attendance record with IST date
+
+    // Create new attendance record with forced date
     attendance = new Attendance({
       employee: req.employee.id,
       date: todayDate,
@@ -93,6 +95,7 @@ router.post('/check-in', auth, async (req, res) => {
       status: 'Present'
     });
     
+    console.log('Creating new attendance record for forced date');
     const savedAttendance = await attendance.save();
     console.log(`Created new attendance record: ${savedAttendance._id}`);
     
@@ -106,10 +109,10 @@ router.post('/check-in', auth, async (req, res) => {
       console.error('Duplicate key error detected');
       
       try {
-        // Try to find and return the existing record using IST date
-        const today = moment().format('YYYY-MM-DD');
-        const todayDate = new Date(today);
-        const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
+        // Try to find and return the existing record using forced date
+        const forcedToday = "2025-03-12";
+        const todayDate = new Date(forcedToday);
+        const tomorrowDate = new Date(new Date(forcedToday).getTime() + 24*60*60*1000);
         
         const existingRecord = await Attendance.findOne({
           employee: req.employee.id,
@@ -141,14 +144,14 @@ router.post('/check-out', auth, async (req, res) => {
   try {
     console.log(`Check-out attempt for employee ${req.employee.id}`);
     
-    // Use IST timezone for today's date
-    const today = moment().format('YYYY-MM-DD');
-    const todayDate = new Date(today);
-    const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
+    // Use the same forced date as check-in
+    const forcedToday = "2025-03-12";
+    const todayDate = new Date(forcedToday);
+    const tomorrowDate = new Date(new Date(forcedToday).getTime() + 24*60*60*1000);
     
-    console.log(`Check-out date (IST): ${today}`);
+    console.log(`Using forced date for check-out: ${forcedToday}`);
     
-    // Find today's attendance record
+    // Find today's attendance record using forced date
     const attendance = await Attendance.findOne({
       employee: req.employee.id,
       date: {
@@ -197,7 +200,7 @@ router.post('/leave-request', auth, async (req, res) => {
       return res.status(400).json({ msg: 'Leave date is required' });
     }
     
-    // Format the date properly for MongoDB (use IST for consistency)
+    // Format the date properly for MongoDB
     const formattedLeaveDate = moment(leaveDate).format('YYYY-MM-DD');
     
     // Create a leave request with properly formatted date
@@ -227,16 +230,14 @@ router.post('/leave-request', auth, async (req, res) => {
 // @access  Private
 router.get('/attendance', auth, async (req, res) => {
   try {
-    // Use IST timezone for month boundaries
-    const startOfMonth = moment().startOf('month').format('YYYY-MM-DD');
-    const endOfMonth = moment().endOf('month').format('YYYY-MM-DD');
-    const nextDay = moment(endOfMonth).add(1, 'days').format('YYYY-MM-DD');
+    const startOfMonth = moment().startOf('month');
+    const endOfMonth = moment().endOf('month');
 
     const attendance = await Attendance.find({
       employee: req.employee.id,
       date: {
-        $gte: new Date(startOfMonth),
-        $lt: new Date(nextDay)
+        $gte: startOfMonth.toDate(),
+        $lte: endOfMonth.toDate()
       }
     }).sort({ date: 1 });
 
@@ -335,73 +336,17 @@ router.post('/fix-database', auth, async (req, res) => {
   }
 });
 
-// @route   POST api/employee/fix-attendance
-// @desc    Fix duplicate attendance records
-// @access  Private
-router.post('/fix-attendance', auth, async (req, res) => {
-  try {
-    console.log(`Attempting to fix attendance records for employee ${req.employee.id}`);
-    
-    // Find all attendance records for this employee
-    const records = await Attendance.find({ employee: req.employee.id });
-    console.log(`Found ${records.length} total attendance records`);
-    
-    // Group by date (YYYY-MM-DD format)
-    const recordsByDate = {};
-    records.forEach(record => {
-      const dateKey = moment(record.date).format('YYYY-MM-DD');
-      if (!recordsByDate[dateKey]) {
-        recordsByDate[dateKey] = [];
-      }
-      recordsByDate[dateKey].push(record);
-    });
-    
-    // For dates with multiple records, keep only the most complete one
-    let cleaned = 0;
-    for (const dateKey in recordsByDate) {
-      const dateRecords = recordsByDate[dateKey];
-      if (dateRecords.length > 1) {
-        console.log(`Found ${dateRecords.length} records for date ${dateKey}`);
-        
-        // Sort by completeness (records with both check-in and check-out first)
-        dateRecords.sort((a, b) => {
-          const aScore = (a.checkInTime ? 1 : 0) + (a.checkOutTime ? 1 : 0);
-          const bScore = (b.checkInTime ? 1 : 0) + (b.checkOutTime ? 1 : 0);
-          return bScore - aScore;
-        });
-        
-        // Keep the first (most complete) record, delete the rest
-        for (let i = 1; i < dateRecords.length; i++) {
-          console.log(`Deleting duplicate record ${dateRecords[i]._id} for date ${dateKey}`);
-          await Attendance.findByIdAndDelete(dateRecords[i]._id);
-          cleaned++;
-        }
-      }
-    }
-    
-    console.log(`Database fix completed. Cleaned ${cleaned} duplicate records.`);
-    res.json({ 
-      message: `Database fixed. Cleaned ${cleaned} duplicate records.`,
-      success: true,
-      recordsCleaned: cleaned
-    });
-  } catch (err) {
-    console.error('Fix attendance error:', err);
-    res.status(500).json({ msg: 'Server error: ' + err.message });
-  }
-});
-
 // @route   POST api/employee/reset-today
-// @desc    Force reset today's attendance record (for timezone debugging)
+// @desc    Reset today's attendance (force delete March 12 record)
 // @access  Private
 router.post('/reset-today', auth, async (req, res) => {
   try {
-    console.log(`Attempting to reset today's attendance for employee ${req.employee.id}`);
+    console.log(`Attempting to reset attendance for employee ${req.employee.id}`);
     
-    // Use IST timezone for today's date
-    const today = moment().format('YYYY-MM-DD');
-    const todayDate = new Date(today);
-    const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
+    // Use forced date for consistency
+    const forcedToday = "2025-03-12";
+    const todayDate = new Date(forcedToday);
+    const tomorrowDate = new Date(new Date(forcedToday).getTime() + 24*60*60*1000);
     
     // Delete today's attendance record
     const result = await Attendance.deleteOne({
