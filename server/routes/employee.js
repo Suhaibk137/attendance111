@@ -8,6 +8,9 @@ const Notification = require('../models/Notification');
 const moment = require('moment');
 const mongoose = require('mongoose');
 
+// Set default timezone to IST (UTC+5:30)
+moment.tz.setDefault("Asia/Kolkata");
+
 // Middleware to verify employee token
 const auth = async (req, res, next) => {
   // Get token from header
@@ -55,19 +58,19 @@ router.post('/check-in', auth, async (req, res) => {
     });
     console.log(`Cleaned up ${cleanupResult.deletedCount} records with null dates`);
     
-    // Use a simple date string for consistency
-    const today = new Date();
-    const dateString = today.toISOString().split('T')[0]; // Gets YYYY-MM-DD
-    const todayDate = new Date(dateString);
+    // Use IST timezone for today's date
+    const today = moment().format('YYYY-MM-DD');
+    const todayDate = new Date(today);
+    const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
     
-    console.log(`Check-in date: ${dateString}`);
+    console.log(`Check-in date (IST): ${today}`);
     
-    // First try to find an existing record
+    // First try to find an existing record using IST dates
     let attendance = await Attendance.findOne({
       employee: req.employee.id,
       date: {
-        $gte: new Date(dateString),
-        $lt: new Date(new Date(dateString).setDate(new Date(dateString).getDate() + 1))
+        $gte: todayDate,
+        $lt: tomorrowDate
       }
     });
     
@@ -75,18 +78,18 @@ router.post('/check-in', auth, async (req, res) => {
       console.log(`Found existing attendance record: ${attendance._id}`);
       // Update existing record if no check-in time
       if (!attendance.checkInTime) {
-        attendance.checkInTime = today;
+        attendance.checkInTime = new Date();
         attendance.status = 'Present';
         await attendance.save();
       }
       return res.json(attendance);
     }
     
-    // Create new attendance record
+    // Create new attendance record with IST date
     attendance = new Attendance({
       employee: req.employee.id,
       date: todayDate,
-      checkInTime: today,
+      checkInTime: new Date(),
       status: 'Present'
     });
     
@@ -103,13 +106,16 @@ router.post('/check-in', auth, async (req, res) => {
       console.error('Duplicate key error detected');
       
       try {
-        // Try to find and return the existing record
-        const today = moment().startOf('day');
+        // Try to find and return the existing record using IST date
+        const today = moment().format('YYYY-MM-DD');
+        const todayDate = new Date(today);
+        const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
+        
         const existingRecord = await Attendance.findOne({
           employee: req.employee.id,
           date: {
-            $gte: today.toDate(),
-            $lt: moment(today).endOf('day').toDate()
+            $gte: todayDate,
+            $lt: tomorrowDate
           }
         });
         
@@ -135,15 +141,19 @@ router.post('/check-out', auth, async (req, res) => {
   try {
     console.log(`Check-out attempt for employee ${req.employee.id}`);
     
-    const today = moment().startOf('day');
-    console.log(`Today's date (server time): ${today.format('YYYY-MM-DD')}`);
+    // Use IST timezone for today's date
+    const today = moment().format('YYYY-MM-DD');
+    const todayDate = new Date(today);
+    const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
+    
+    console.log(`Check-out date (IST): ${today}`);
     
     // Find today's attendance record
     const attendance = await Attendance.findOne({
       employee: req.employee.id,
       date: {
-        $gte: today.toDate(),
-        $lt: moment(today).endOf('day').toDate()
+        $gte: todayDate,
+        $lt: tomorrowDate
       }
     });
 
@@ -187,7 +197,7 @@ router.post('/leave-request', auth, async (req, res) => {
       return res.status(400).json({ msg: 'Leave date is required' });
     }
     
-    // Format the date properly for MongoDB
+    // Format the date properly for MongoDB (use IST for consistency)
     const formattedLeaveDate = moment(leaveDate).format('YYYY-MM-DD');
     
     // Create a leave request with properly formatted date
@@ -217,14 +227,16 @@ router.post('/leave-request', auth, async (req, res) => {
 // @access  Private
 router.get('/attendance', auth, async (req, res) => {
   try {
-    const startOfMonth = moment().startOf('month');
-    const endOfMonth = moment().endOf('month');
+    // Use IST timezone for month boundaries
+    const startOfMonth = moment().startOf('month').format('YYYY-MM-DD');
+    const endOfMonth = moment().endOf('month').format('YYYY-MM-DD');
+    const nextDay = moment(endOfMonth).add(1, 'days').format('YYYY-MM-DD');
 
     const attendance = await Attendance.find({
       employee: req.employee.id,
       date: {
-        $gte: startOfMonth.toDate(),
-        $lte: endOfMonth.toDate()
+        $gte: new Date(startOfMonth),
+        $lt: new Date(nextDay)
       }
     }).sort({ date: 1 });
 
@@ -375,6 +387,42 @@ router.post('/fix-attendance', auth, async (req, res) => {
     });
   } catch (err) {
     console.error('Fix attendance error:', err);
+    res.status(500).json({ msg: 'Server error: ' + err.message });
+  }
+});
+
+// @route   POST api/employee/reset-today
+// @desc    Force reset today's attendance record (for timezone debugging)
+// @access  Private
+router.post('/reset-today', auth, async (req, res) => {
+  try {
+    console.log(`Attempting to reset today's attendance for employee ${req.employee.id}`);
+    
+    // Use IST timezone for today's date
+    const today = moment().format('YYYY-MM-DD');
+    const todayDate = new Date(today);
+    const tomorrowDate = new Date(moment(today).add(1, 'days').format('YYYY-MM-DD'));
+    
+    // Delete today's attendance record
+    const result = await Attendance.deleteOne({
+      employee: req.employee.id,
+      date: {
+        $gte: todayDate,
+        $lt: tomorrowDate
+      }
+    });
+    
+    console.log(`Reset result: ${JSON.stringify(result)}`);
+    
+    res.json({
+      success: true,
+      deleted: result.deletedCount > 0,
+      message: result.deletedCount > 0 
+        ? "Today's attendance record has been reset. You can now check in again." 
+        : "No attendance record found for today."
+    });
+  } catch (err) {
+    console.error('Reset error:', err);
     res.status(500).json({ msg: 'Server error: ' + err.message });
   }
 });
