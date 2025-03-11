@@ -5,7 +5,10 @@ const Employee = require('../models/Employee');
 const Attendance = require('../models/Attendance');
 const LeaveRequest = require('../models/LeaveRequest');
 const Notification = require('../models/Notification');
-const moment = require('moment');
+const moment = require('moment-timezone');
+
+// Set default timezone to IST
+moment.tz.setDefault("Asia/Kolkata");
 
 // Middleware to verify admin token
 const adminAuth = async (req, res, next) => {
@@ -56,16 +59,19 @@ router.get('/attendance', adminAuth, async (req, res) => {
     if (date) {
       queryDate = new Date(date);
     } else {
-      queryDate = new Date();
+      // Use IST date
+      queryDate = new Date(moment().format('YYYY-MM-DD'));
     }
     
-    const startOfDay = moment(queryDate).startOf('day');
-    const endOfDay = moment(queryDate).endOf('day');
+    // Get start and end of day in IST
+    const dateString = moment(queryDate).format('YYYY-MM-DD');
+    const startOfDay = new Date(dateString);
+    const endOfDay = new Date(moment(dateString).add(1, 'days').format('YYYY-MM-DD'));
     
     const attendance = await Attendance.find({
       date: {
-        $gte: startOfDay.toDate(),
-        $lte: endOfDay.toDate()
+        $gte: startOfDay,
+        $lt: endOfDay
       }
     }).populate('employee', 'name email emCode');
 
@@ -110,15 +116,19 @@ router.get('/attendance/monthly', adminAuth, async (req, res) => {
   try {
     const { year, month, employeeId } = req.query;
     
-    // Create date range for the month
-    const startDate = moment(`${year}-${month}-01`).startOf('month');
-    const endDate = moment(startDate).endOf('month');
+    // Create date range for the month using IST timezone
+    const startDateStr = `${year}-${month}-01`;
+    const startDate = new Date(startDateStr);
+    const nextMonth = parseInt(month) === 12 ? 1 : parseInt(month) + 1;
+    const nextMonthYear = parseInt(month) === 12 ? parseInt(year) + 1 : parseInt(year);
+    const endDateStr = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01`;
+    const endDate = new Date(endDateStr);
     
     // Build query
     let query = {
       date: {
-        $gte: startDate.toDate(),
-        $lte: endDate.toDate()
+        $gte: startDate,
+        $lt: endDate
       }
     };
     
@@ -138,21 +148,23 @@ router.get('/attendance/monthly', adminAuth, async (req, res) => {
       
       if (employee) {
         // Generate all days in the month
-        const daysInMonth = endDate.date();
+        const daysInMonth = new Date(year, month, 0).getDate();
         const allDays = [];
         
         for (let day = 1; day <= daysInMonth; day++) {
-          const date = moment(`${year}-${month}-${day}`).startOf('day');
+          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const date = new Date(dateStr);
           
           // Skip future dates
-          if (date > moment()) {
+          if (date > new Date(moment().format('YYYY-MM-DD'))) {
             continue;
           }
           
           // Check if we have an attendance record for this day
           const existingRecord = attendance.find(record => {
-            const recordDate = moment(record.date).startOf('day');
-            return recordDate.isSame(date, 'day');
+            const recordDate = moment(record.date).format('YYYY-MM-DD');
+            const currentDate = moment(date).format('YYYY-MM-DD');
+            return recordDate === currentDate;
           });
           
           if (existingRecord) {
@@ -167,7 +179,7 @@ router.get('/attendance/monthly', adminAuth, async (req, res) => {
                 email: employee.email,
                 emCode: employee.emCode || employee.employeeCode
               },
-              date: date.toDate(),
+              date: date,
               checkInTime: null,
               checkOutTime: null,
               status: 'Absent'
@@ -204,22 +216,23 @@ router.post('/attendance/update', adminAuth, async (req, res) => {
       return res.status(404).json({ msg: 'Employee not found' });
     }
 
-    // Format the date
-    const attendanceDate = moment(date).startOf('day');
+    // Format the date using IST timezone
+    const dateStr = moment(date).format('YYYY-MM-DD');
+    const nextDateStr = moment(dateStr).add(1, 'days').format('YYYY-MM-DD');
     
     // Find or create attendance record
     let attendance = await Attendance.findOne({
       employee: employeeId,
       date: {
-        $gte: attendanceDate.toDate(),
-        $lt: moment(attendanceDate).endOf('day').toDate()
+        $gte: new Date(dateStr),
+        $lt: new Date(nextDateStr)
       }
     });
     
     if (!attendance) {
       attendance = new Attendance({
         employee: employeeId,
-        date: attendanceDate.toDate(),
+        date: new Date(dateStr),
         status
       });
     } else {
@@ -319,21 +332,22 @@ router.post('/leave-requests/update', adminAuth, async (req, res) => {
     // If approved, update attendance
     if (status === 'Approved') {
       try {
-        const leaveDate = moment(leaveRequest.leaveDate).startOf('day');
+        const leaveDateStr = moment(leaveRequest.leaveDate).format('YYYY-MM-DD');
+        const nextDateStr = moment(leaveDateStr).add(1, 'days').format('YYYY-MM-DD');
         
         // Find or create attendance record
         let attendance = await Attendance.findOne({
           employee: leaveRequest.employee._id,
           date: {
-            $gte: leaveDate.toDate(),
-            $lt: moment(leaveDate).endOf('day').toDate()
+            $gte: new Date(leaveDateStr),
+            $lt: new Date(nextDateStr)
           }
         });
         
         if (!attendance) {
           attendance = new Attendance({
             employee: leaveRequest.employee._id,
-            date: leaveDate.toDate(),
+            date: new Date(leaveDateStr),
             status: 'Absent'  // Changed from "On Leave" to "Absent" as requested
           });
         } else {
