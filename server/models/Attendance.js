@@ -16,7 +16,7 @@ const attendanceSchema = mongoose.Schema({
     },
     // Apply getter to normalize the date to midnight to prevent time-based comparison issues
     get: function(date) {
-      return moment(date).startOf('day').toDate();
+      return date ? moment(date).startOf('day').toDate() : null;
     }
   },
   checkInTime: {
@@ -37,7 +37,13 @@ const attendanceSchema = mongoose.Schema({
 });
 
 // Create a compound index to ensure one attendance record per employee per day
-attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ 
+  employee: 1, 
+  date: 1 
+}, { 
+  unique: true,
+  partialFilterExpression: { date: { $type: "date" } } // Only apply index when date exists
+});
 
 // Pre-save middleware to normalize date to midnight
 attendanceSchema.pre('save', function(next) {
