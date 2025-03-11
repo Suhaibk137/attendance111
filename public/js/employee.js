@@ -130,28 +130,33 @@ document.addEventListener('DOMContentLoaded', function() {
       return `${year}-${month}-${day}`;
     }
   
-    // Fix duplicate attendance records
-    async function fixAttendanceRecords() {
+    // Fix database issues
+    async function fixDatabase() {
       try {
-        const response = await fetch(`${API_BASE_URL}/employee/fix-attendance`, {
+        showErrorMessage('Attempting to fix database issues...');
+        
+        const response = await fetch(`${API_BASE_URL}/employee/fix-database`, {
           method: 'POST',
           headers
         });
 
         if (!response.ok) {
-          throw new Error('Failed to fix attendance records');
+          throw new Error('Failed to fix database issues');
         }
 
         const result = await response.json();
-        console.log('Fix attendance result:', result);
+        console.log('Database fix result:', result);
         
-        // Refresh attendance data
+        showSuccessMessage(`Database fixed: ${result.message}`);
+        
+        // Refresh data
         await fetchTodayAttendance();
         await fetchMonthlyAttendance();
         
         return result;
       } catch (error) {
-        console.error('Error fixing attendance records:', error);
+        console.error('Error fixing database:', error);
+        showErrorMessage('Could not fix database issues. Please contact support.');
       }
     }
 
@@ -159,6 +164,9 @@ document.addEventListener('DOMContentLoaded', function() {
     async function performCheckIn() {
       try {
         checkInBtn.disabled = true; // Prevent double-clicks
+        
+        // First try to fix any database issues
+        await fixDatabase();
         
         const response = await fetch(`${API_BASE_URL}/employee/check-in`, {
           method: 'POST',
@@ -184,25 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
       } catch (error) {
         console.error('Error checking in:', error);
         checkInBtn.disabled = false; // Re-enable button
-        
-        // If we get a server error, try to fix the database and try again
-        if (error.message.includes('Server error')) {
-          showErrorMessage('Attempting to fix check-in issue...');
-          
-          try {
-            await fixAttendanceRecords();
-            // Try check-in again after fixing
-            showErrorMessage('Database fixed. Trying to check in again...');
-            setTimeout(async () => {
-              await fetchTodayAttendance();
-            }, 1000);
-          } catch (fixError) {
-            console.error('Error during fix attempt:', fixError);
-            showErrorMessage('Could not resolve check-in issue. Please contact support.');
-          }
-        } else {
-          showErrorMessage(error.message || 'Failed to check in');
-        }
+        showErrorMessage(error.message || 'Failed to check in');
       }
     }
   
